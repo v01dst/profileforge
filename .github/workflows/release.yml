@@ -1,0 +1,35 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    name: Release
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: '1.22'
+      - name: Build binaries
+        run: |
+          mkdir -p dist
+          for os in linux darwin windows; do
+            for arch in amd64 arm64; do
+              ext=""
+              if [ "$os" = "windows" ]; then ext=".exe"; fi
+              if [ "$os" = "darwin" ] && [ "$arch" = "arm64" ]; then :; fi
+              GOOS=$os GOARCH=$arch go build -ldflags="-s -w -X main.version=${GITHUB_REF_NAME}" -o dist/profileforge-${os}-${arch}${ext} .
+            done
+          done
+          cd dist && sha256sum * > checksums.txt
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/*
